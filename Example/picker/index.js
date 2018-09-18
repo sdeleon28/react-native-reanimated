@@ -1,4 +1,5 @@
 import React from 'react';
+import { TouchableOpacity, Text } from 'react-native';
 import { StyleSheet, View } from 'react-native';
 import Animated, { Easing } from 'react-native-reanimated';
 import { PanGestureHandler, State } from 'react-native-gesture-handler';
@@ -32,9 +33,20 @@ const {
 const VALUE_HEIGHT = 50;
 
 const styles = StyleSheet.create({
-  screen: {
+  wrapper: {
     flex: 1,
+    alignSelf: 'stretch',
+  },
+  screen: {
+    flex: 9,
     alignItems: 'center',
+  },
+  loadSection: {
+    flex: 1,
+    flexDirection: 'row',
+  },
+  loadSectionHalf: {
+    flex: 1,
   },
   thing: {
     height: VALUE_HEIGHT,
@@ -133,6 +145,10 @@ const decelerate = (yPositionOnRelease, dragY, velocityY) => {
 const stripes = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
 
 class Picker extends React.Component {
+  state = {
+    randomNumber: 0
+  }
+
   constructor(props) {
     super(props)
 
@@ -166,27 +182,48 @@ class Picker extends React.Component {
     )
   }
 
+  startLoad = () => {
+    setInterval(() => {
+        let num = 0;
+        for (let i = 0; i < 100000000; i++) {
+            num += Math.round(Math.random() / 1.69 * 100);
+        }
+        this.setState({ randomNumber: num });
+    }, 500);
+  }
+
   render() {
+    const { randomNumber } = this.state;
     return (
-      <View style={styles.screen}>
-        <View style={styles.stripes}>
-          {stripes.map(stripe => <View style={styles.stripe} />)}
+      <View style={styles.wrapper}>
+        <View style={styles.screen}>
+          <View style={styles.stripes}>
+            {stripes.map(stripe => <View style={styles.stripe} />)}
+          </View>
+          <PanGestureHandler
+            maxPointers={1}
+            onGestureEvent={this.onGestureEvent}
+            onHandlerStateChange={this.onGestureEvent}>
+            <Animated.View style={
+              [
+                styles.thing,
+                {
+                  transform: [
+                    { translateY: this._transY }
+                  ]
+                }
+              ]
+            } />
+          </PanGestureHandler>
         </View>
-        <PanGestureHandler
-          maxPointers={1}
-          onGestureEvent={this.onGestureEvent}
-          onHandlerStateChange={this.onGestureEvent}>
-          <Animated.View style={
-            [
-              styles.thing,
-              {
-                transform: [
-                  { translateY: this._transY }
-                ]
-              }
-            ]
-          } />
-        </PanGestureHandler>
+        <View style={styles.loadSection}>
+          <TouchableOpacity style={styles.loadSectionHalf} onPress={this.startLoad}>
+            <Text>Start load</Text>
+          </TouchableOpacity>
+          <View style={styles.loadSectionHalf}>
+            <Text>{randomNumber}</Text>
+          </View>
+        </View>
       </View>
     )
   }
