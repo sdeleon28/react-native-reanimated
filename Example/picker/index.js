@@ -6,6 +6,7 @@ import { PanGestureHandler, State } from 'react-native-gesture-handler';
 const {
   add,
   divide,
+  debug,
   ceil,
   floor,
   greaterOrEq,
@@ -92,7 +93,7 @@ const runSnap = (clock, yPositionOnRelease, dragY) => {
   ])
 }
 
-const decelerate = (decelerateClock, yPositionOnRelease, dragY, velocityY) => {
+const decelerate = (yPositionOnRelease, dragY, velocityY) => {
   const state = {
     finished: new Value(0),
     velocity: new Value(0),
@@ -104,17 +105,28 @@ const decelerate = (decelerateClock, yPositionOnRelease, dragY, velocityY) => {
     deceleration: 0.99
   }
 
+  const decelerateClock = new Clock()
+  const snapClock = new Clock()
+
   return block([
-    cond(clockRunning(decelerateClock), 0, [
+    cond(or(clockRunning(decelerateClock), clockRunning(snapClock)), 0, [
       set(state.finished, 0),
       set(state.velocity, velocityY),
       set(state.time, 0),
       set(state.position, yPositionOnRelease),
       startClock(decelerateClock),
     ]),
-    decay(decelerateClock, state, config),
-    cond(state.finished, stopClock(decelerateClock)),
-    state.position,
+    cond(state.finished,
+      [
+        stopClock(decelerateClock),
+        set(state.position, runSnap(snapClock, state.position, dragY)),
+        state.position
+      ],
+      [
+        decay(decelerateClock, state, config),
+        state.position,
+      ]
+    ),
   ])
 }
 
@@ -128,7 +140,6 @@ class Picker extends React.Component {
     this.velocityY = new Value(0)
     this.offsetY = new Value(0)
     this.gestureState = new Value(-1)
-    this.decelerateClock = new Clock()
     this.snapClock = new Clock()
 
     this.onGestureEvent = event([
@@ -147,8 +158,8 @@ class Picker extends React.Component {
       addY,
       cond(eq(this.gestureState, State.END),
         [
-          set(this.offsetY, decelerate(this.decelerateClock, addY, this.dragY, this.velocityY)),
-          // set(this.offsetY, runSnap(this.snapClock, this.offsetY, this.dragY)),
+          set(this.offsetY, decelerate(addY, this.dragY, this.velocityY)),
+          // set(this.offsetY, runSnap(addY, this.dragY)),
         ],
         set(this.offsetY, addY),
       ),
