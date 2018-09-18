@@ -10,6 +10,8 @@ const {
   floor,
   greaterOrEq,
   or,
+  and,
+  not,
   multiply,
   block,
   call,
@@ -19,6 +21,7 @@ const {
   eq,
   set,
   timing,
+  decay,
   Value,
   clockRunning,
   startClock,
@@ -65,6 +68,7 @@ const runSnap = (clock, yPositionOnRelease, dragY) => {
     toValue: new Value(0),
     easing: Easing.inOut(Easing.ease),
   };
+
   const decimalValueIndex = divide(yPositionOnRelease, VALUE_HEIGHT)
   const step = cond(greaterOrEq(dragY, 0),
     ceil(decimalValueIndex),
@@ -88,6 +92,32 @@ const runSnap = (clock, yPositionOnRelease, dragY) => {
   ])
 }
 
+const decelerate = (decelerateClock, yPositionOnRelease, dragY, velocityY) => {
+  const state = {
+    finished: new Value(0),
+    velocity: new Value(0),
+    position: new Value(0),
+    time: new Value(0),
+  }
+
+  const config = {
+    deceleration: 0.99
+  }
+
+  return block([
+    cond(clockRunning(decelerateClock), 0, [
+      set(state.finished, 0),
+      set(state.velocity, velocityY),
+      set(state.time, 0),
+      set(state.position, yPositionOnRelease),
+      startClock(decelerateClock),
+    ]),
+    decay(decelerateClock, state, config),
+    cond(state.finished, stopClock(decelerateClock)),
+    state.position,
+  ])
+}
+
 const stripes = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
 
 class Picker extends React.Component {
@@ -95,14 +125,17 @@ class Picker extends React.Component {
     super(props)
 
     this.dragY = new Value(0)
+    this.velocityY = new Value(0)
     this.offsetY = new Value(0)
     this.gestureState = new Value(-1)
+    this.decelerateClock = new Clock()
     this.snapClock = new Clock()
 
     this.onGestureEvent = event([
       {
         nativeEvent: {
           translationY: this.dragY,
+          velocityY: this.velocityY,
           state: this.gestureState,
         },
       },
@@ -110,11 +143,13 @@ class Picker extends React.Component {
 
     const addY = add(this.dragY, this.offsetY)
 
-    this._transY = cond(
-      eq(this.gestureState, State.ACTIVE),
+    this._transY = cond(eq(this.gestureState, State.ACTIVE),
       addY,
       cond(eq(this.gestureState, State.END),
-        set(this.offsetY, runSnap(this.snapClock, addY, this.dragY)),
+        [
+          set(this.offsetY, decelerate(this.decelerateClock, addY, this.dragY, this.velocityY)),
+          // set(this.offsetY, runSnap(this.snapClock, this.offsetY, this.dragY)),
+        ],
         set(this.offsetY, addY),
       ),
     )
